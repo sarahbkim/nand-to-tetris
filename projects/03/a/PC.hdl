@@ -16,5 +16,14 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    // increment the previous output
+    Inc16(in=n, out=j);
+    // if inc == 1, return inc, else return previous output
+    Mux16(a=m, b=j, sel=inc, out=o);
+    // if load == 1, return in, else return p
+    Mux16(a=o, b=in, sel=load, out=p);
+    // if reset == 1, return 0, else return o;
+    Mux16(a=p, b=false, sel=reset, out=q);
+    // set the outputs, circle back outputs
+    Register(in=q, load=true, out=out, out=n, out=m);
 }
