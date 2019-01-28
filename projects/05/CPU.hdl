@@ -39,5 +39,81 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    // split instructions
+    Not(in=instruction[15], out=aInst);
+    Not(in=aInst, out=cInst);
+    Mux16(sel=cInst, a=false, b=instruction,
+        out[12]=aCode,
+        out[11]=zx,
+        out[10]=nx,
+        out[9]=zy,
+        out[8]=ny,
+        out[7]=f,
+        out[6]=no,
+        out[5]=loadA,
+        out[4]=loadD,
+        out[3]=loadM,
+        out[2]=jumpLt,
+        out[1]=jumpEq,
+        out[0]=jumpGt);
+
+    // pick input of A register
+    // is a c-instruction and loadA
+    And(a=cInst, b=loadA, out=loadALUoutToA);
+    Mux16(a=instruction, b=outALU, sel=loadALUoutToA, out=aRegInput);
+
+    // load the A register
+    Or(a=aInst, b=loadALUoutToA, out=loadAreg);
+
+    // if aInst = true, load entire into A Register
+    ARegister(in=aRegInput, load=loadAreg, out=aRegOut, out[0..14]=addressM);
+
+    // if cInstr = true && a-bit == 1, loadA. else load inM
+    Mux16(a=aRegOut, b=inM, sel=aCode, out=inALU);
+
+    // if loadD = true, load the D register
+    And(a=cInst, b=loadD, out=loadDreg);
+    DRegister(in=outALU, load=loadDreg, out=dRegOut);
+
+    ALU(
+        // ALU inputs
+        x=dRegOut,
+        y=inALU, 
+        // C-instruction comp bits
+        zx=zx,
+        nx=nx,
+        zy=zy,
+        ny=ny,
+        f=f,
+        no=no,
+        // ALU outputs
+        out=outALU,
+        out=outM, // M value output
+        zr=zr,
+        ng=ng);
+
+    // Program counter stores address of the next instruction
+    // out < 0
+    And(a=jumpLt, b=ng, out=lessThan);
+    // out = 1
+    And(a=jumpEq, b=zr, out=equal);
+    // out > 0
+    Or(a=zr, b=ng, out=zeroOrNeg);
+    Not(in=zeroOrNeg, out=tmpK);
+
+    And(a=tmpK, b=jumpGt, out=greaterThan);
+
+    Or(a=lessThan, b=equal, out=jle);
+    Or(a=jle, b=greaterThan, out=shouldJump);
+
+    // only jump if c-instruction
+    And(a=shouldJump, b=cInst, out=load);
+
+    Not(in=load, out=inc);
+
+    // pc
+    PC(in=aRegOut, load=load, inc=inc, reset=reset, out[0..14]=pc);
+
+    // write to M if d3 is true
+    And(a=loadM, b=true, out=writeM);
 }
